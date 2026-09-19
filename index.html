@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>刈谷市 学校マップ｜完成サンプル</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+*{box-sizing:border-box}html,body,#app{height:100%;margin:0}body{font-family:-apple-system,BlinkMacSystemFont,"Noto Sans JP","Yu Gothic",sans-serif;color:#222;overflow:hidden}
+#map{position:absolute;inset:0}
+.panel{position:absolute;z-index:1000;left:12px;top:12px;width:min(340px,calc(100vw - 24px));background:rgba(255,255,255,.96);border-radius:16px;box-shadow:0 2px 14px rgba(0,0,0,.2);padding:14px}
+h1{font-size:17px;margin:0 0 10px}.sub{font-size:11px;color:#777;margin-top:-6px;margin-bottom:10px}
+.search{width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:10px;font-size:14px;outline:none}
+.filters{display:flex;gap:6px;margin:9px 0;flex-wrap:wrap}
+.f{border:1px solid #ddd;background:#fff;border-radius:20px;padding:6px 10px;font-size:12px;cursor:pointer}
+.f.on{color:#fff;border-color:transparent}.f[data-t="all"].on{background:#444}.f[data-t="小"].on{background:#2878d0}.f[data-t="中"].on{background:#27a36a}.f[data-t="高"].on{background:#e27b21}
+.count{font-size:11px;color:#666;margin:5px 0}
+.list{max-height:34vh;overflow:auto;border-top:1px solid #eee;margin-top:7px}
+.row{padding:9px 3px;border-bottom:1px solid #eee;font-size:13px;display:flex;align-items:center;gap:8px;cursor:pointer}
+.badge{width:22px;height:22px;border-radius:50%;color:#fff;font-weight:700;font-size:11px;display:grid;place-items:center;flex:none}
+.tip{position:absolute;z-index:1000;right:12px;bottom:18px;background:rgba(255,255,255,.95);padding:9px 11px;border-radius:12px;box-shadow:0 1px 8px #aaa;font-size:11px;max-width:280px}
+.legend{font-size:12px;line-height:1.8}.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:4px}
+.leaflet-popup-content-wrapper{border-radius:14px}.popup-title{font-weight:700;font-size:16px;margin-bottom:6px}
+.popup-type{font-size:11px;color:#666;margin-bottom:8px}.grid{display:grid;grid-template-columns:72px 1fr;gap:5px;font-size:12px}
+.note{margin-top:9px;padding:8px;border-radius:9px;background:#f6f6f6;font-size:11px;line-height:1.5}
+.small{font-size:10px;color:#888;margin-top:7px}
+@media(max-width:600px){.panel{top:10px;left:10px;width:calc(100vw - 20px)}.list{max-height:27vh}.tip{bottom:10px;right:10px}}
+</style>
+</head>
+<body>
+<div id="app"><div id="map"></div>
+<div class="panel">
+  <h1>📍 刈谷市 学校マップ</h1>
+  <div class="sub">町名・道路・学区を見ながら、学校をタップして偏差値を確認</div>
+  <input id="search" class="search" placeholder="学校名・住所で検索">
+  <button id="townBtn" class="f" style="margin-bottom:8px">🏘️ 町名から学校を探す</button>
+  <div class="filters">
+    <button class="f on" data-t="all">すべて</button>
+    <button class="f" data-t="小">🔵 小学校</button>
+    <button class="f" data-t="中">🟢 中学校</button>
+    <button class="f" data-t="高">🟠 高校</button>
+  </div>
+  <div id="count" class="count"></div>
+  <div id="list" class="list"></div>
+<div class="small" style="margin-top:8px">学校一覧：刈谷市・愛知県の公開情報を基準。高校偏差値：2026年度版。町境・町名：公開地理データを利用。</div>
+</div>
+
+<div id="townPanel" style="position:absolute;z-index:1100;left:12px;bottom:18px;width:min(340px,calc(100vw - 24px));background:rgba(255,255,255,.97);border-radius:16px;box-shadow:0 2px 14px rgba(0,0,0,.2);padding:13px;display:none">
+ <div style="font-weight:700;font-size:15px;margin-bottom:7px">🏘️ 町名から学校を探す</div>
+ <select id="townSelect" style="width:100%;padding:9px;border:1px solid #ddd;border-radius:9px;font-size:13px">
+  <option value="">町名を選択してください</option>
+ </select>
+ <div id="townResult" style="font-size:12px;line-height:1.6;margin-top:8px"></div>
+</div>
+<div class="tip">
+  <div class="legend"><span class="dot" style="background:#2878d0"></span>小学校　
+  <span class="dot" style="background:#27a36a"></span>中学校　
+  <span class="dot" style="background:#e27b21"></span>高校</div>
+  <div>学校ピンをタップ → 偏差値を表示</div>
+</div>
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+<script src="schools.js"></script>
+const colors={"小":"#2878d0","中":"#27a36a","高":"#e27b21"};
+const labels={"小":"小学校","中":"中学校","高":"高校"};
+const map=L.map("map",{zoomControl:false}).setView([34.99,137.00],13);
+L.control.zoom({position:"bottomright"}).addTo(map);
+
+// Light base map: simple enough to keep school/town information readable.
+L.tileLayer("https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png", {
+ maxZoom:18, attribution:"地理院タイル（国土地理院）"
+}).addTo(map);
+
+// A second layer gives a familiar road/label view when needed.
+const osm=L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+ maxZoom:19, attribution:"© OpenStreetMap contributors"
+});
+const base={"淡色地図（町名・道路）":map._layers[Object.keys(map._layers)[0]],"OpenStreetMap":osm};
+const overlays={"町境（取得できる境界）":townLayer,"町名":townLabelLayer};
+L.control.layers(base,overlays,{position:"bottomright"}).addTo(map);
+
+function icon(t){
+ return L.divIcon({className:"",iconSize:[30,30],iconAnchor:[15,30],popupAnchor:[0,-28],
+ html:`<div style="width:24px;height:24px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${colors[t]};border:2px solid #fff;box-shadow:0 1px 5px #555">
+ <span style="display:block;transform:rotate(45deg);color:#fff;text-align:center;font-weight:800;font-size:11px;line-height:20px">●</span></div>`});
+}
+const markers=[];
+function popup(s){
+ return `<div class="popup-title">${s[1]}</div>
+ <div class="popup-type">${labels[s[0]]}　${s[2]}</div>
+ <div class="grid"><b>偏差値</b><span style="font-weight:700;font-size:16px">${s[3]}</span></div>
+ <div class="note">※高校の偏差値は2026年度版の「みんなの高校情報」掲載値を使用。小・中学校はこのサンプルでは「—」です。</div>
+ <div class="small">偏差値は模試等に基づく参考値で、学校の教育内容等の優劣を示すものではありません。</div>`;
+}
+function renderList(){
+ const q=document.getElementById("search").value.trim().toLowerCase();
+ const active=document.querySelector(".f.on").dataset.t;
+ const arr=schools.filter(s=>(active==="all"||s[0]===active)&&(!q||(s[1]+s[2]).toLowerCase().includes(q)));
+ document.getElementById("count").textContent=`表示：${arr.length}校 / 全${schools.length}校`;
+ document.getElementById("list").innerHTML=arr.map((s,i)=>`<div class="row" data-key="${schools.indexOf(s)}"><span class="badge" style="background:${colors[s[0]]}">${s[0]}</span><span>${s[1]}<br><small style="color:#888">${s[2]}</small></span></div>`).join("");
+ document.querySelectorAll(".row").forEach(r=>r.onclick=()=>{
+   const m=markers[+r.dataset.key]; if(m && m.getLatLng){map.setView(m.getLatLng(),16);m.openPopup();}
+ });
+}
+document.querySelectorAll(".f").forEach(b=>b.onclick=()=>{document.querySelectorAll(".f").forEach(x=>x.classList.remove("on"));b.classList.add("on");renderList()});
+document.getElementById("search").oninput=renderList;
+
+async function geocode(s){
+ const url="https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=jp&q="+encodeURIComponent(s[2]+" 愛知県刈谷市");
+ try{const r=await fetch(url,{headers:{"Accept":"application/json"}});const j=await r.json();return j[0]?[+j[0].lat,+j[0].lon]:null}catch(e){return null}
+}
+
+// 町境・町名レイヤー：OpenStreetMapで公開されている刈谷市内の行政境界/地域名を取得。
+// 取得できる境界を地図上に薄い線で重ね、タップすると名称を表示します。
+const townLayer = L.layerGroup().addTo(map);
+const townLabelLayer = L.layerGroup().addTo(map);
+
+async function loadTownBoundaries(){
+  const q = `[out:json][timeout:25];
+  area["boundary"="administrative"]["name"="刈谷市"]->.kariya;
+  (
+    rel(area.kariya)["boundary"="administrative"];
+    way(area.kariya)["boundary"="administrative"];
+  );
+  out tags center geom;`;
+  try{
+    const r = await fetch("https://overpass-api.de/api/interpreter?data="+encodeURIComponent(q));
+    const j = await r.json();
+    for(const e of (j.elements||[])){
+      const name = e.tags && e.tags.name;
+      if(!name) continue;
+      let latlngs=[];
+      if(e.type==="way" && e.geometry) latlngs=e.geometry.map(x=>[x.lat,x.lon]);
+      if(e.type==="relation" && e.members){
+        const ways=e.members.filter(m=>m.type==="way"&&m.geometry);
+        for(const w of ways) latlngs.push(w.geometry.map(x=>[x.lat,x.lon]));
+      }
+      if(Array.isArray(latlngs[0]) && typeof latlngs[0][0]==="number"){
+        L.polyline(latlngs,{color:"#555",weight:1.4,opacity:.62,dashArray:"5 4"}).bindTooltip(name,{sticky:true}).addTo(townLayer);
+      }else if(Array.isArray(latlngs[0])){
+        for(const seg of latlngs) L.polyline(seg,{color:"#555",weight:1.4,opacity:.62,dashArray:"5 4"}).bindTooltip(name,{sticky:true}).addTo(townLayer);
+      }
+      if(e.center){
+        L.marker([e.center.lat,e.center.lon],{
+          interactive:false,
+          icon:L.divIcon({className:"",html:`<div style="font-size:10px;font-weight:700;color:#555;text-shadow:0 0 3px #fff,0 0 3px #fff;white-space:nowrap">${name}</div>`,iconSize:[100,16],iconAnchor:[50,8]})
+        }).addTo(townLabelLayer);
+      }
+    }
+  }catch(e){
+    console.warn("town boundary layer unavailable",e);
+  }
+}
+
+const districtMap={"亀城小学校": ["逢妻町", "八幡町", "寺横町", "銀座", "城町", "広小路", "新栄町", "熊野町", "宝町", "豊田町", "司町"], "小高原小学校": ["桜町", "相生町", "昭和町", "八軒町", "朝日町", "東新町", "池田町", "新富町", "丸田町", "原崎町", "神明町", "矢場町", "小山町", "稲場町"], "日高小学校": ["高倉町", "山池町", "高津波町", "三田町", "逢妻町"], "衣浦小学校": ["港町", "天王町", "元町", "御幸町", "富士見町", "大正町", "衣崎町", "浜町", "中川町", "中島町", "田町", "松坂町"], "住吉小学校": ["住吉町", "幸町", "下重原町", "重原本町", "一色町", "中山町", "城町", "寿町", "東陽町", "高松町", "大手町", "南桜町", "若松町", "神田町"], "かりがね小学校": ["築地町", "泉田町", "一ツ木町", "恩田町", "青山町", "新田町"], "平成小学校": ["一ツ木町", "恩田町", "青山町"], "富士松南小学校": ["今川町", "今岡町"], "富士松北小学校": ["井ケ谷町", "東境町", "西境町"], "富士松東小学校": ["東境町", "西境町", "一里山町"], "小垣江小学校": ["小垣江町", "荒井町"], "小垣江東小学校": ["小垣江町", "半城土町"], "双葉小学校": ["小垣江町", "高須町", "半城土中町", "半城土北町", "半城土西町", "半城土町"], "東刈谷小学校": ["板倉町", "東刈谷町", "末広町", "野田町", "沖野町", "南沖野町", "場割町"], "朝日小学校": ["野田町", "野田新町", "松栄町", "半城土町"]};
+const townSelect=document.getElementById("townSelect");
+const townPanel=document.getElementById("townPanel");
+Object.keys(districtMap).flatMap(k=>districtMap[k]).filter((v,i,a)=>a.indexOf(v)===i).sort((a,b)=>a.localeCompare(b,"ja")).forEach(t=>{
+ const o=document.createElement("option");o.value=t;o.textContent=t;townSelect.appendChild(o);
+});
+document.getElementById("townBtn").onclick=()=>{townPanel.style.display=townPanel.style.display==="none"?"block":"none"};
+townSelect.onchange=()=>{
+ const t=townSelect.value;
+ if(!t){document.getElementById("townResult").innerHTML="";return}
+ const elementary=Object.entries(districtMap).filter(([s,ts])=>ts.includes(t)).map(([s])=>s);
+ const middle={
+  "刈谷南中学校":["港町","天王町","元町","御幸町","富士見町","大正町","衣崎町","浜町","中川町","中島町","田町","松坂町","住吉町","幸町","下重原町","重原本町","一色町","中山町","城町","司町","銀座","広小路","新栄町","寿町","東陽町","高松町","大手町","南桜町","若松町","神田町"],
+  "刈谷東中学校":["相生町","桜町","八軒町","朝日町","昭和町","丸田町","神明町","原崎町","矢場町","高倉町","山池町","高津波町","三田町","逢妻町","熊野町","八幡町","宝町","寺横町","豊田町","中手町","日高町","稲場町","小山町","新富町","池田町","東新町","広見町","一番町"],
+  "富士松中学校":["井ケ谷町","東境町","西境町","今川町","今岡町","一里山町"],
+  "雁が音中学校":["泉田町","築地町","一ツ木町","恩田町","青山町","新田町"],
+  "依佐美中学校":["小垣江町","荒井町","高須町","半城土中町","半城土北町","半城土西町","半城土町"],
+  "朝日中学校":["野田町","板倉町","松栄町","東刈谷町","末広町","沖野町","野田新町","南沖野町","場割町","半城土町"]
+ };
+ const middleNames=Object.entries(middle).filter(([s,ts])=>ts.includes(t)).map(([s])=>s);
+ document.getElementById("townResult").innerHTML=
+ `<b>${t}</b><br>小学校：${elementary.join("、")||"—"}<br>中学校：${middleNames.join("、")||"—"}`;
+};
+
+loadTownBoundaries();
+
+(async()=>{
+ for(let i=0;i<schools.length;i++){
+   const s=schools[i], p=await geocode(s);
+   if(p){
+     const m=L.marker(p,{icon:icon(s[0])}).addTo(map).bindPopup(popup(s),{maxWidth:300});
+     markers[i]=m;
+   }
+   await new Promise(r=>setTimeout(r,550));
+ }
+ renderList();
+})();
+</script>
+</body></html>
