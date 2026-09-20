@@ -13,7 +13,7 @@ h1{font-size:17px;margin:0 0 10px}.sub{font-size:11px;color:#777;margin-top:-6px
 .search{width:100%;padding:10px 12px;border:1px solid #ddd;border-radius:10px;font-size:14px;outline:none}
 .filters{display:flex;gap:6px;margin:9px 0;flex-wrap:wrap}
 .f{border:1px solid #ddd;background:#fff;border-radius:20px;padding:6px 10px;font-size:12px;cursor:pointer}
-.f.on{color:#fff;border-color:transparent}.f[data-t="all"].on{background:#444}.f[data-t="小"].on{background:#2878d0}.f[data-t="中"].on{background:#27a36a}.f[data-t="高"].on{background:#e27b21}
+.f.on{color:#fff;border-color:transparent}.f[data-t="all"].on{background:#444}.f[data-t="小"].on{background:#2878d0}.f[data-t="中"].on{background:#27a36a}.f[data-t="高"].on{background:#e27b21}.f[data-t="JAC"].on{background:#e53935}
 .count{font-size:11px;color:#666;margin:5px 0}
 .list{max-height:34vh;overflow:auto;border-top:1px solid #eee;margin-top:7px}
 .row{padding:9px 3px;border-bottom:1px solid #eee;font-size:13px;display:flex;align-items:center;gap:8px;cursor:pointer}
@@ -31,7 +31,7 @@ h1{font-size:17px;margin:0 0 10px}.sub{font-size:11px;color:#777;margin-top:-6px
 <div id="app"><div id="map"></div>
 <div class="panel">
   <h1>📍 刈谷市 学校マップ</h1>
-  <div class="sub">町名・道路・学区を見ながら、学校をタップして偏差値を確認</div>
+  <div class="sub">町名・道路・学区を見ながら、学校やJAC-Academyをタップして詳細を確認</div>
   <input id="search" class="search" placeholder="学校名・住所で検索">
   <button id="townBtn" class="f" style="margin-bottom:8px">🏘️ 町名から学校を探す</button>
   <div class="filters">
@@ -39,10 +39,11 @@ h1{font-size:17px;margin:0 0 10px}.sub{font-size:11px;color:#777;margin-top:-6px
     <button class="f" data-t="小">🔵 小学校</button>
     <button class="f" data-t="中">🟢 中学校</button>
     <button class="f" data-t="高">🟠 高校</button>
+    <button class="f" data-t="JAC">🔴 JAC</button>
   </div>
   <div id="count" class="count"></div>
   <div id="list" class="list"></div>
-<div class="small" style="margin-top:8px">学校一覧：刈谷市・愛知県の公開情報を基準。高校偏差値：2026年度版。町境・町名：公開地理データを利用。</div>
+<div class="small" style="margin-top:8px">学校一覧：刈谷市・愛知県の公開情報を基準。高校偏差値：2026年度版。JAC-Academy：公式サイト等の公開情報を基準。町境・町名：公開地理データを利用。</div>
 </div>
 
 <div id="townPanel" style="position:absolute;z-index:1100;left:12px;bottom:18px;width:min(340px,calc(100vw - 24px));background:rgba(255,255,255,.97);border-radius:16px;box-shadow:0 2px 14px rgba(0,0,0,.2);padding:13px;display:none">
@@ -55,15 +56,16 @@ h1{font-size:17px;margin:0 0 10px}.sub{font-size:11px;color:#777;margin-top:-6px
 <div class="tip">
   <div class="legend"><span class="dot" style="background:#2878d0"></span>小学校　
   <span class="dot" style="background:#27a36a"></span>中学校　
-  <span class="dot" style="background:#e27b21"></span>高校</div>
-  <div>学校ピンをタップ → 偏差値を表示（全27校）</div>
+  <span class="dot" style="background:#e27b21"></span>高校　
+  <span class="dot" style="background:#e53935"></span>JAC-Academy</div>
+  <div>学校ピンをタップ → 詳細を表示（学校27校＋JAC）</div>
 </div>
 </div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="schools.js"></script>
 <script>
-const colors={"小":"#2878d0","中":"#27a36a","高":"#e27b21"};
-const labels={"小":"小学校","中":"中学校","高":"高校"};
+const colors={"小":"#2878d0","中":"#27a36a","高":"#e27b21","JAC":"#e53935"};
+const labels={"小":"小学校","中":"中学校","高":"高校","JAC":"JAC-Academy"};
 const map=L.map("map",{zoomControl:false}).setView([34.99,137.00],13);
 L.control.zoom({position:"bottomright"}).addTo(map);
 
@@ -86,12 +88,23 @@ const overlays={"町境（取得できる境界）":townLayer,"町名":townLabel
 L.control.layers(base,overlays,{position:"bottomright"}).addTo(map);
 
 function icon(t){
+ if(t==="JAC"){
+   return L.divIcon({className:"",iconSize:[40,40],iconAnchor:[20,20],popupAnchor:[0,-20],
+     html:`<div style="width:38px;height:38px;border-radius:50%;background:#e53935;border:3px solid #fff;box-shadow:0 1px 6px #555;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:10px;letter-spacing:-.3px">JAC</div>`});
+ }
  return L.divIcon({className:"",iconSize:[30,30],iconAnchor:[15,30],popupAnchor:[0,-28],
  html:`<div style="width:24px;height:24px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${colors[t]};border:2px solid #fff;box-shadow:0 1px 5px #555">
  <span style="display:block;transform:rotate(45deg);color:#fff;text-align:center;font-weight:800;font-size:11px;line-height:20px">●</span></div>`});
 }
 const markers=[];
 function popup(s){
+ if(s[0]==="JAC"){
+   return `<div class="popup-title">${s[1]}</div>
+   <div class="popup-type" style="color:#e53935;font-weight:700">🔴 JAC-Academy</div>
+   <div class="grid"><b>住所</b><span>${s[2]}</span></div>
+   <div class="note">声優・ナレーション、デジタルイラスト、動画制作などの講座を展開する総合学院です。</div>
+   <div style="margin-top:9px"><a href="https://www.jac-academy.com/" target="_blank" rel="noopener" style="color:#d32f2f;font-weight:700;text-decoration:none">公式サイトを見る →</a></div>`;
+ }
  return `<div class="popup-title">${s[1]}</div>
  <div class="popup-type">${labels[s[0]]}　${s[2]}</div>
  <div class="grid"><b>偏差値</b><span style="font-weight:700;font-size:16px">${s[3]}</span></div>
@@ -102,8 +115,8 @@ function renderList(){
  const q=document.getElementById("search").value.trim().toLowerCase();
  const active=document.querySelector(".f.on").dataset.t;
  const arr=schools.filter(s=>(active==="all"||s[0]===active)&&(!q||(s[1]+s[2]).toLowerCase().includes(q)));
- document.getElementById("count").textContent=`表示：${arr.length}校 / 全${schools.length}校`;
- document.getElementById("list").innerHTML=arr.map((s,i)=>`<div class="row" data-key="${schools.indexOf(s)}"><span class="badge" style="background:${colors[s[0]]}">${s[0]}</span><span>${s[1]}<br><small style="color:#888">${s[2]}</small></span></div>`).join("");
+ document.getElementById("count").textContent=active==="JAC" ? `表示：${arr.length}件 / 全${schools.length-1}校＋JAC 1件` : `表示：${arr.length}校 / 全27校`;
+ document.getElementById("list").innerHTML=arr.map((s,i)=>`<div class="row" data-key="${schools.indexOf(s)}"><span class="badge" style="background:${colors[s[0]]}">${s[0]==="JAC"?"JAC":s[0]}</span><span>${s[1]}<br><small style="color:#888">${s[2]}</small></span></div>`).join("");
  document.querySelectorAll(".row").forEach(r=>r.onclick=()=>{
    const m=markers[+r.dataset.key]; if(m && m.getLatLng){map.setView(m.getLatLng(),16);m.openPopup();}
  });
