@@ -56,7 +56,7 @@ h1{font-size:17px;margin:0 0 10px}.sub{font-size:11px;color:#777;margin-top:-6px
   <div class="legend"><span class="dot" style="background:#2878d0"></span>小学校　
   <span class="dot" style="background:#27a36a"></span>中学校　
   <span class="dot" style="background:#e27b21"></span>高校</div>
-  <div>学校ピンをタップ → 偏差値を表示</div>
+  <div>学校ピンをタップ → 偏差値を表示（全27校）</div>
 </div>
 </div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -111,10 +111,8 @@ function renderList(){
 document.querySelectorAll(".f").forEach(b=>b.onclick=()=>{document.querySelectorAll(".f").forEach(x=>x.classList.remove("on"));b.classList.add("on");renderList()});
 document.getElementById("search").oninput=renderList;
 
-async function geocode(s){
- const url="https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=jp&q="+encodeURIComponent(s[2]+" 愛知県刈谷市");
- try{const r=await fetch(url,{headers:{"Accept":"application/json"}});const j=await r.json();return j[0]?[+j[0].lat,+j[0].lon]:null}catch(e){return null}
-}
+// 学校位置は schools.js に固定座標として登録しています。
+// 住所検索APIには依存しないため、全27校のピンを毎回確実に表示します。
 
 // 町境・町名レイヤー：OpenStreetMapで公開されている刈谷市内の行政境界/地域名を取得。
 // 取得できる境界を地図上に薄い線で重ね、タップすると名称を表示します。
@@ -181,16 +179,15 @@ townSelect.onchange=()=>{
 
 loadTownBoundaries();
 
-(async()=>{
- for(let i=0;i<schools.length;i++){
-   const s=schools[i], p=await geocode(s);
-   if(p){
-     const m=L.marker(p,{icon:icon(s[0])}).addTo(map).bindPopup(popup(s),{maxWidth:300});
-     markers[i]=m;
-   }
-   await new Promise(r=>setTimeout(r,550));
- }
- renderList();
-})();
+
+// 学校ピン：schools.js に登録した固定座標をそのまま使用。
+for(let i=0;i<schools.length;i++){
+  const s=schools[i];
+  const m=L.marker([s[4],s[5]],{icon:icon(s[0])})
+    .addTo(map)
+    .bindPopup(popup(s),{maxWidth:300});
+  markers[i]=m;
+}
+renderList();
 </script>
 </body></html>
