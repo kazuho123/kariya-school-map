@@ -60,23 +60,28 @@ h1{font-size:17px;margin:0 0 10px}.sub{font-size:11px;color:#777;margin-top:-6px
 </div>
 </div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script>
 <script src="schools.js"></script>
+<script>
 const colors={"小":"#2878d0","中":"#27a36a","高":"#e27b21"};
 const labels={"小":"小学校","中":"中学校","高":"高校"};
 const map=L.map("map",{zoomControl:false}).setView([34.99,137.00],13);
 L.control.zoom({position:"bottomright"}).addTo(map);
 
-// Light base map: simple enough to keep school/town information readable.
-L.tileLayer("https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png", {
+// 地図のベースレイヤー
+const gsi=L.tileLayer("https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png", {
  maxZoom:18, attribution:"地理院タイル（国土地理院）"
-}).addTo(map);
-
-// A second layer gives a familiar road/label view when needed.
+});
 const osm=L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
  maxZoom:19, attribution:"© OpenStreetMap contributors"
 });
-const base={"淡色地図（町名・道路）":map._layers[Object.keys(map._layers)[0]],"OpenStreetMap":osm};
+// 最初からOSMを表示して、タイル取得に失敗した場合でも切り替えやすくします。
+osm.addTo(map);
+
+// 町境・町名レイヤー
+const townLayer = L.layerGroup().addTo(map);
+const townLabelLayer = L.layerGroup().addTo(map);
+
+const base={"OpenStreetMap":osm,"淡色地図（国土地理院）":gsi};
 const overlays={"町境（取得できる境界）":townLayer,"町名":townLabelLayer};
 L.control.layers(base,overlays,{position:"bottomright"}).addTo(map);
 
@@ -113,9 +118,6 @@ async function geocode(s){
 
 // 町境・町名レイヤー：OpenStreetMapで公開されている刈谷市内の行政境界/地域名を取得。
 // 取得できる境界を地図上に薄い線で重ね、タップすると名称を表示します。
-const townLayer = L.layerGroup().addTo(map);
-const townLabelLayer = L.layerGroup().addTo(map);
-
 async function loadTownBoundaries(){
   const q = `[out:json][timeout:25];
   area["boundary"="administrative"]["name"="刈谷市"]->.kariya;
