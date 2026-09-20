@@ -62,7 +62,7 @@ h1{font-size:17px;margin:0 0 10px}.sub{font-size:11px;color:#777;margin-top:-6px
 </div>
 </div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="schools.js"></script>
+<script src="schools.js?v=2"></script>
 <script>
 const colors={"小":"#2878d0","中":"#27a36a","高":"#e27b21","JAC":"#e53935"};
 const labels={"小":"小学校","中":"中学校","高":"高校","JAC":"JAC-Academy"};
@@ -116,9 +116,13 @@ function renderList(){
  const active=document.querySelector(".f.on").dataset.t;
  const arr=schools.filter(s=>(active==="all"||s[0]===active)&&(!q||(s[1]+s[2]).toLowerCase().includes(q)));
  document.getElementById("count").textContent=active==="JAC" ? `表示：${arr.length}件 / 全${schools.length-1}校＋JAC 1件` : `表示：${arr.length}校 / 全27校`;
- document.getElementById("list").innerHTML=arr.map((s,i)=>`<div class="row" data-key="${schools.indexOf(s)}"><span class="badge" style="background:${colors[s[0]]}">${s[0]==="JAC"?"JAC":s[0]}</span><span>${s[1]}<br><small style="color:#888">${s[2]}</small></span></div>`).join("");
+ document.getElementById("list").innerHTML=arr.map(s=>{const key=schools.indexOf(s);return `<div class="row" data-key="${key}"><span class="badge" style="background:${colors[s[0]]}">${s[0]==="JAC"?"JAC":s[0]}</span><span>${s[1]}<br><small style="color:#888">${s[2]}</small></span></div>`;}).join("");
  document.querySelectorAll(".row").forEach(r=>r.onclick=()=>{
-   const m=markers[+r.dataset.key]; if(m && m.getLatLng){map.setView(m.getLatLng(),16);m.openPopup();}
+   const idx=Number(r.dataset.key);
+   const m=markers[idx];
+   if(!m) return;
+   map.setView(m.getLatLng(),17,{animate:true});
+   setTimeout(()=>m.openPopup(),250);
  });
 }
 document.querySelectorAll(".f").forEach(b=>b.onclick=()=>{document.querySelectorAll(".f").forEach(x=>x.classList.remove("on"));b.classList.add("on");renderList()});
@@ -196,10 +200,18 @@ loadTownBoundaries();
 // 学校ピン：schools.js に登録した固定座標をそのまま使用。
 for(let i=0;i<schools.length;i++){
   const s=schools[i];
-  const m=L.marker([s[4],s[5]],{icon:icon(s[0])})
+  const m=L.marker([Number(s[4]),Number(s[5])],{icon:icon(s[0]),zIndexOffset:s[0]==="JAC"?1000:0})
     .addTo(map)
     .bindPopup(popup(s),{maxWidth:300});
   markers[i]=m;
+}
+// JAC is also created explicitly so it remains visible/clickable even if an older schools.js is cached.
+const jacIndex=schools.findIndex(s=>s[0]==="JAC");
+if(jacIndex>=0){
+  const s=schools[jacIndex];
+  markers[jacIndex]=L.marker([34.9854,137.0067],{icon:icon("JAC"),zIndexOffset:2000})
+    .addTo(map)
+    .bindPopup(popup(s),{maxWidth:300});
 }
 renderList();
 </script>
